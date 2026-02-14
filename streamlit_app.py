@@ -7,14 +7,27 @@ os.environ['TRANSFORMERS_NO_TF'] = '1'
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
 import streamlit as st
-import requests
 import json
 import html
 from pathlib import Path
 import config
 
-# Backend URL
-BACKEND_URL = f"http://{config.FLASK_HOST}:{config.FLASK_PORT}"
+# Direct service imports (no Flask backend needed)
+from services.transcript_service import TranscriptService
+from services.segmentation_service import SegmentationService
+from services.summarization_service import SummarizationService
+from services.embedding_service import EmbeddingService
+from services.search_service import SearchService
+from services.export_service import ExportService
+from utils.youtube_utils import extract_video_id, get_video_metadata
+
+# Initialize services (will be done in main)
+transcript_service = None
+segmentation_service = None
+summarization_service = None
+embedding_service = None
+search_service = None
+export_service = None
 
 # Page configuration
 st.set_page_config(
@@ -375,67 +388,139 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-def check_backend_health():
-    """Check if backend is running"""
+def initialize_services():
+    """Initialize all services with API key"""
+    global transcript_service, segmentation_service, summarization_service
+    global embedding_service, search_service, export_service
+    
+    if not config.GEMINI_API_KEY:
+        return False
+    
     try:
-        response = requests.get(f"{BACKEND_URL}/health", timeout=2)
-        return response.status_code == 200
-    except:
+        transcript_service = TranscriptService()
+        segmentation_service = SegmentationService(
+            chunk_size=config.CHUNK_SIZE,
+            chunk_overlap=config.CHUNK_OVERLAP
+        )
+        summarization_service = SummarizationService(
+            api_key=config.GEMINI_API_KEY,
+            model_name=config.GEMINI_MODEL
+        )
+        embedding_service = EmbeddingService(model_name=config.EMBEDDING_MODEL)
+        search_service = SearchService()
+        export_service = ExportService()
+        return True
+    except Exception as e:
+        st.error(f"Failed to initialize services: {e}")
         return False
 
 
 def process_video(url, language='en', translate=False):
-    """Call backend to process video"""
+    """Process video directly using services"""
     try:
-        response = requests.post(
-            f"{BACKEND_URL}/process_video",
-            json={
-                'url': url,
-                'language': language,
-                'translate': translate
-            },
-            timeout=300  # 5 minutes timeout
+        # Extract video ID
+        video_id = extract_video_id(url)
+        if not video_id:
+            return {'error': 'Invalid YouTube URL'}
+        
+        # Get metadata
+        metadata = get_video_metadata(video_id)
+        video_title = metadata.get('title', 'Unknown Video')
+        
+        # Get transcript
+        transcript_data = transcript_service.get_transcript(video_id, language)
+        full_text = transcript_data['full_text']
+        transcript = transcript_data['transcript']
+        
+        # Translate if needed
+        if translate and transcript_data['language'] != 'en':
+            full_text = summarization_service.translate_to_english(full_text)
+        
+        # Segment transcript
+        chunks = segmentation_service.segment_transcript(transcript)
+        
+        # Generate embeddings
+        embeddings = embedding_service.generate_embeddings(chunks)
+        
+        # Create search index
+        search_service.create_index(embeddings, chunks, video_id)
+        
+        # Generate summaries
+        executive_summary = summarization_service.generate_executive_summary(
+            full_text, video_title
         )
         
-        if response.status_code == 200:
-            return response.json()
-        else:
-            return {'error': response.json().get('error', 'Unknown error')}
+        section_summaries = summarization_service.generate_section_summaries(
+            chunks, video_title
+        )
+        
+        highlights = summarization_service.generate_highlights(full_text, chunks)
+        
+        # Calculate metrics
+        total_words = sum([chunk['word_count'] for chunk in chunks])
+        avg_chunk_words = total_words / len(chunks) if chunks else 0
+        coverage_percent = min(100, (len(chunks) * avg_chunk_words / total_words * 100)) if total_words > 0 else 0
+        
+        # Save summary for export
+        summary_data = {
+            'video_id': video_id,
+            'metadata': metadata,
+            'executive_summary': executive_summary,
+            'section_summaries': section_summaries,
+            'highlights': highlights
+        }
+        export_service.save_summary(video_id, summary_data)
+        
+        return {
+            'video_id': video_id,
+            'metadata': metadata,
+            'executive_summary': executive_summary,
+            'section_summaries': section_summaries,
+            'highlights': highlights,
+            'metrics': {
+                'coverage_percent': coverage_percent,
+                'confidence_score': 0.85,
+                'total_chunks': len(chunks),
+                'total_words': total_words
+            }
+        }
     
-    except requests.exceptions.Timeout:
-        return {'error': 'Request timed out. Please try again.'}
     except Exception as e:
         return {'error': str(e)}
 
 
 def search_transcript(video_id, query, top_k=5):
-    """Call backend to search transcript"""
+    """Search transcript directly using services"""
     try:
-        response = requests.post(
-            f"{BACKEND_URL}/search",
-            json={
-                'video_id': video_id,
-                'query': query,
-                'top_k': top_k
-            },
-            timeout=30
-        )
+        # Perform search
+        results = search_service.search(video_id, query, top_k)
         
-        if response.status_code == 200:
-            return response.json()
-        else:
-            return {'error': response.json().get('error', 'Unknown error')}
+        # Get AI answer
+        answer = None
+        if results:
+            answer = summarization_service.answer_question(query, results)
+        
+        return {
+            'results': results,
+            'answer': answer,
+            'query': query
+        }
     
     except Exception as e:
         return {'error': str(e)}
 
 
-def get_export_url(video_id, format_type):
-    """Get export URL for markdown or PDF"""
-    if format_type == 'markdown':
-        return f"{BACKEND_URL}/export_markdown/{video_id}"
-    else:
-        return f"{BACKEND_URL}/export_pdf/{video_id}"
+def get_export_data(video_id, format_type):
+    """Get export data for download"""
+    try:
+        if format_type == 'markdown':
+            content = export_service.export_markdown(video_id)
+            return content, f"{video_id}_summary.md", "text/markdown"
+        else:
+            content = export_service.export_pdf(video_id)
+            return content, f"{video_id}_summary.pdf", "application/pdf"
+    except Exception as e:
+        return None, None, None
 
 
 def main():
@@ -449,12 +534,13 @@ def main():
     </div>
     """, unsafe_allow_html=True)
     
-    # Check backend
-    if not check_backend_health():
+    # Initialize services
+    if not initialize_services():
         st.markdown("""
         <div class="error-box">
-            <strong>Backend Server Not Running</strong><br/>
-            Please start the Flask backend first by running: <code>python app.py</code>
+            <strong>Configuration Error</strong><br/>
+            Please set GEMINI_API_KEY in your environment variables or .env file<br/>
+            Get your key from: <a href="https://aistudio.google.com/app/apikey" style="color: #DC2626;">Google AI Studio</a>
         </div>
         """, unsafe_allow_html=True)
         return
@@ -693,20 +779,32 @@ def main():
             col1, col2 = st.columns(2)
             
             with col1:
-                markdown_url = get_export_url(result['video_id'], 'markdown')
-                st.link_button(
-                    "Download Markdown",
-                    markdown_url,
-                    use_container_width=True
-                )
+                # Get markdown content
+                md_content, md_filename, md_mime = get_export_data(result['video_id'], 'markdown')
+                if md_content:
+                    st.download_button(
+                        label="📄 Download Markdown",
+                        data=md_content,
+                        file_name=md_filename,
+                        mime=md_mime,
+                        use_container_width=True
+                    )
+                else:
+                    st.error("Failed to generate Markdown")
             
             with col2:
-                pdf_url = get_export_url(result['video_id'], 'pdf')
-                st.link_button(
-                    "Download PDF",
-                    pdf_url,
-                    use_container_width=True
-                )
+                # Get PDF content
+                pdf_content, pdf_filename, pdf_mime = get_export_data(result['video_id'], 'pdf')
+                if pdf_content:
+                    st.download_button(
+                        label="📄 Download PDF",
+                        data=pdf_content,
+                        file_name=pdf_filename,
+                        mime=pdf_mime,
+                        use_container_width=True
+                    )
+                else:
+                    st.error("Failed to generate PDF")
             st.markdown('</div>', unsafe_allow_html=True)
     
     with tab2:

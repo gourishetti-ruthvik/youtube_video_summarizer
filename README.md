@@ -150,6 +150,20 @@ load_dotenv()
 
 ### 6. Run the Application
 
+**Option A: Standalone Mode (Recommended for Deployment)**
+
+Just run Streamlit - all backend logic is integrated:
+
+```bash
+streamlit run streamlit_app.py
+```
+
+Open browser to: http://localhost:8501
+
+**Option B: Full Stack Mode (Local Development)**
+
+For local development with separate backend:
+
 **Step 1: Start Flask Backend**
 
 Open a terminal and run:
@@ -354,13 +368,22 @@ Gemini prompts are designed to:
 
 ## 🚀 Deployment Options
 
-**Streamlit Cloud** (Easiest):
-1. Go to https://share.streamlit.io
-2. Connect GitHub repository
-3. Deploy with `streamlit_app.py`
-4. Add API key in Settings → Secrets
+**Streamlit Cloud (Easiest - FREE)**
 
-**Other Platforms**: Render.com, Railway.app, Heroku, Docker - all supported!
+The app now runs in **standalone mode** without needing Flask backend!
+
+1. Go to https://share.streamlit.io
+2. Sign in with GitHub
+3. Click "New app"
+4. Select repository: `gourishetti-ruthvik/youtube_video_summarizer`
+5. Main file: `streamlit_app.py`
+6. In Settings → Secrets, add:
+   ```toml
+   GEMINI_API_KEY = "your_api_key_here"
+   ```
+7. Click "Deploy" ✅
+
+**Other Platforms**: Railway.app, Heroku, Render.com all supported!
 
 ## �🔒 Privacy & Data
 
