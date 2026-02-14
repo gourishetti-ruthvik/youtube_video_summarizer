@@ -352,20 +352,15 @@ Gemini prompts are designed to:
 **Highlight [05:43]:**
 "Always use virtual environments. This is the number one thing that will save you from dependency hell."
 
-## � Deployment
+## 🚀 Deployment Options
 
-Ready to deploy your application? See the comprehensive [DEPLOYMENT.md](DEPLOYMENT.md) guide for:
+**Streamlit Cloud** (Easiest):
+1. Go to https://share.streamlit.io
+2. Connect GitHub repository
+3. Deploy with `streamlit_app.py`
+4. Add API key in Settings → Secrets
 
-- **Streamlit Cloud**: Free, easy deployment for public demos
-- **Render.com**: Full-stack deployment with Flask + Streamlit
-- **Railway.app**: Simple deployment with auto-scaling  
-- **Heroku**: Traditional PaaS deployment
-- **Docker**: Containerized deployment
-- **Streamlit-Only Mode**: Simplified single-service deployment
-
-Each platform includes step-by-step instructions, cost estimates, and production optimization tips.
-
-**Quick Start**: For the easiest deployment, use [Streamlit Cloud](https://share.streamlit.io) - it's free for public repositories!
+**Other Platforms**: Render.com, Railway.app, Heroku, Docker - all supported!
 
 ## �🔒 Privacy & Data
 
