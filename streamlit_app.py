@@ -462,7 +462,7 @@ def process_video(url, language='en', translate=False):
         avg_chunk_words = total_words / len(chunks) if chunks else 0
         coverage_percent = min(100, (len(chunks) * avg_chunk_words / total_words * 100)) if total_words > 0 else 0
         
-        # Save summary for export
+        # Prepare summary data for return
         summary_data = {
             'video_id': video_id,
             'metadata': metadata,
@@ -470,7 +470,6 @@ def process_video(url, language='en', translate=False):
             'section_summaries': section_summaries,
             'highlights': highlights
         }
-        export_service.save_summary(video_id, summary_data)
         
         return {
             'video_id': video_id,
