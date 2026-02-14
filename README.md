@@ -2,6 +2,17 @@
 
 A complete, production-ready application for extracting YouTube video transcripts, generating AI-powered summaries with Google Gemini, and enabling semantic search through video content using FAISS vector search.
 
+## 🚨 SECURITY NOTICE
+
+**⚠️ API Key Security**: If you cloned this repo before the security fix (commit 36810c7), your API key may have been exposed. Please:
+
+1. **Immediately regenerate your Gemini API key** at https://aistudio.google.com/app/apikey
+2. Delete the old exposed key
+3. Update your local `.env` file with the new key
+4. **NEVER** commit `.env` files or real API keys to GitHub
+
+The `.env.example` file now contains only placeholders. Your actual `.env` file is protected by `.gitignore`.
+
 ## ✨ Features
 
 ### 🎯 Core Capabilities
@@ -341,7 +352,22 @@ Gemini prompts are designed to:
 **Highlight [05:43]:**
 "Always use virtual environments. This is the number one thing that will save you from dependency hell."
 
-## 🔒 Privacy & Data
+## � Deployment
+
+Ready to deploy your application? See the comprehensive [DEPLOYMENT.md](DEPLOYMENT.md) guide for:
+
+- **Streamlit Cloud**: Free, easy deployment for public demos
+- **Render.com**: Full-stack deployment with Flask + Streamlit
+- **Railway.app**: Simple deployment with auto-scaling  
+- **Heroku**: Traditional PaaS deployment
+- **Docker**: Containerized deployment
+- **Streamlit-Only Mode**: Simplified single-service deployment
+
+Each platform includes step-by-step instructions, cost estimates, and production optimization tips.
+
+**Quick Start**: For the easiest deployment, use [Streamlit Cloud](https://share.streamlit.io) - it's free for public repositories!
+
+## �🔒 Privacy & Data
 
 - All processing happens locally (except Gemini API calls)
 - No data is stored permanently by default
