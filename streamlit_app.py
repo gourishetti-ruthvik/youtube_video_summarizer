@@ -9,6 +9,7 @@ os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 import streamlit as st
 import json
 import html
+import traceback
 from pathlib import Path
 import config
 
@@ -486,7 +487,10 @@ def process_video(url, language='en', translate=False):
         }
     
     except Exception as e:
-        return {'error': str(e)}
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"ERROR in process_video: {error_details}")
+        return {'error': str(e), 'details': error_details}
 
 
 def search_transcript(video_id, query, top_k=5):
@@ -634,9 +638,19 @@ def main():
                 if 'error' in result:
                     st.markdown(f"""
                     <div class="error-box">
-                        <strong>Error:</strong> {result['error']}
+                        <strong>Error:</strong> {result['error']}<br/><br/>
+                        <strong>Common Solutions:</strong><br/>
+                        • Try a different video with closed captions enabled<br/>
+                        • Check if the video is publicly available<br/>
+                        • Some videos may have regional restrictions<br/>
+                        • Educational/tutorial videos typically work best
                     </div>
                     """, unsafe_allow_html=True)
+                    
+                    # Show error details in expander for debugging
+                    if 'details' in result:
+                        with st.expander("🔍 Debug Information"):
+                            st.code(result['details'])
                 else:
                     # Store in session state
                     st.session_state['result'] = result

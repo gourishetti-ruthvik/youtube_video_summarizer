@@ -41,11 +41,18 @@ class TranscriptService:
         transcript_data = self._get_transcript_primary(video_id, language)
         
         if not transcript_data:
-            # Fallback: yt-dlp
+            # Fallback: yt-dlp (often doesn't work on cloud platforms)
+            print("⚠️ Primary method failed, trying fallback (may not work on Streamlit Cloud)...")
             transcript_data = self._get_transcript_fallback(video_id, language)
         
         if not transcript_data:
-            raise Exception("Unable to fetch transcript from any source")
+            raise Exception(
+                "Unable to fetch transcript. This video may have: "
+                "1) Disabled captions/subtitles, "
+                "2) No available transcripts, or "
+                "3) Region restrictions. "
+                "Try a different video with captions enabled."
+            )
         
         # Process transcript
         full_text = self._combine_transcript_text(transcript_data['transcript'])
@@ -72,16 +79,28 @@ class TranscriptService:
             Transcript data or None
         """
         try:
-            # Try to get transcript directly (works with newer API versions)
+            print(f"Attempting to fetch transcript for video: {video_id}")
+            
+            # Try to get transcript directly
             try:
                 transcript_data = YouTubeTranscriptApi.get_transcript(video_id, languages=[language])
-            except Exception:
+                print(f"✓ Got transcript in {language}")
+            except Exception as e1:
+                print(f"Failed to get {language} transcript: {e1}")
                 # Try English as fallback
                 try:
                     transcript_data = YouTubeTranscriptApi.get_transcript(video_id, languages=['en'])
-                except Exception:
+                    print("✓ Got English transcript")
+                except Exception as e2:
+                    print(f"Failed to get English transcript: {e2}")
                     # Get any available transcript
-                    transcript_data = YouTubeTranscriptApi.get_transcript(video_id)
+                    try:
+                        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+                        transcript_data = transcript_list.find_generated_transcript(['en']).fetch()
+                        print("✓ Got auto-generated transcript")
+                    except Exception as e3:
+                        print(f"Failed to get auto-generated: {e3}")
+                        raise
             
             # Format transcript
             formatted_transcript = []
