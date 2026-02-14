@@ -11,6 +11,7 @@ import json
 import html
 import traceback
 from pathlib import Path
+from io import BytesIO
 import config
 
 # Direct service imports (no Flask backend needed)
@@ -513,16 +514,32 @@ def search_transcript(video_id, query, top_k=5):
         return {'error': str(e)}
 
 
-def get_export_data(video_id, format_type):
+def get_export_data(result, format_type):
     """Get export data for download"""
     try:
+        # Build summary_data from result
+        summary_data = {
+            'video_id': result['video_id'],
+            'title': result['metadata'].get('title', 'Video Summary'),
+            'channel': result['metadata'].get('channel', 'Unknown'),
+            'executive_summary': result['executive_summary'],
+            'section_summaries': result['section_summaries'],
+            'highlights': result['highlights'],
+            'metrics': result.get('metrics', {})
+        }
+        
         if format_type == 'markdown':
-            content = export_service.export_markdown(video_id)
-            return content, f"{video_id}_summary.md", "text/markdown"
+            content = export_service.generate_markdown(summary_data)
+            return content, f"{result['video_id']}_summary.md", "text/markdown"
         else:
-            content = export_service.export_pdf(video_id)
-            return content, f"{video_id}_summary.pdf", "application/pdf"
+            # Generate PDF to BytesIO
+            pdf_buffer = BytesIO()
+            export_service.generate_pdf(summary_data, pdf_buffer)
+            pdf_buffer.seek(0)
+            return pdf_buffer.getvalue(), f"{result['video_id']}_summary.pdf", "application/pdf"
     except Exception as e:
+        print(f"Export error: {e}")
+        print(traceback.format_exc())
         return None, None, None
 
 
@@ -793,7 +810,7 @@ def main():
             
             with col1:
                 # Get markdown content
-                md_content, md_filename, md_mime = get_export_data(result['video_id'], 'markdown')
+                md_content, md_filename, md_mime = get_export_data(result, 'markdown')
                 if md_content:
                     st.download_button(
                         label="📄 Download Markdown",
@@ -807,7 +824,7 @@ def main():
             
             with col2:
                 # Get PDF content
-                pdf_content, pdf_filename, pdf_mime = get_export_data(result['video_id'], 'pdf')
+                pdf_content, pdf_filename, pdf_mime = get_export_data(result, 'pdf')
                 if pdf_content:
                     st.download_button(
                         label="📄 Download PDF",
